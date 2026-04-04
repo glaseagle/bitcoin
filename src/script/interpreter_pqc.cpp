@@ -6,18 +6,31 @@
 
 #include <crypto/mldsa/mldsa.h>
 #include <hash.h>
+#include <pubkey.h>
 #include <script/script_pqc.h>
+#include <uint256.h>
 
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstring>
 
-// PQC: TODO: replace this extern bridge with direct secp256k1-backed verification wiring.
-extern bool ECDSAVerify(
-    std::span<const uint8_t> sig,
-    std::span<const uint8_t> hash,
-    std::span<const uint8_t> pubkey);
+// PQC: ECDSA verification via Bitcoin Core's CPubKey::Verify (libsecp256k1).
+// Verifies a DER-encoded signature against a 32-byte sighash and a
+// 33-byte compressed public key — no scriptCode involved.
+static bool ECDSAVerify(
+    std::span<const uint8_t> der_sig,
+    std::span<const uint8_t> hash32,
+    std::span<const uint8_t> pubkey33)
+{
+    if (hash32.size() != 32) return false;
+    CPubKey pk(pubkey33.begin(), pubkey33.end());
+    if (!pk.IsValid()) return false;
+    uint256 msg;
+    std::copy(hash32.begin(), hash32.end(), msg.begin());
+    std::vector<unsigned char> sig(der_sig.begin(), der_sig.end());
+    return pk.Verify(msg, sig);
+}
 
 namespace {
 
