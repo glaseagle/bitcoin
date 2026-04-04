@@ -67,6 +67,7 @@ add_executable(fuzz
   miniscript.cpp
   minisketch.cpp
   mini_miner.cpp
+  mldsa.cpp
   muhash.cpp
   multiplication_overflow.cpp
   net.cpp
@@ -100,6 +101,7 @@ add_executable(fuzz
   rbf.cpp
   rolling_bloom_filter.cpp
   rpc.cpp
+  pqc_script.cpp
   script.cpp
   script_assets_test_minimizer.cpp
   script_descriptor_cache.cpp

@@ -103,6 +103,7 @@ BASE_SCRIPTS = [
     # vv Tests less than 5m vv
     'feature_fee_estimation.py',
     'feature_taproot.py',
+    'feature_pqc.py', # Expected to skip until PQC SegWit v2 activates
     'feature_block.py',
     'mempool_ephemeral_dust.py',
     'wallet_conflicts.py',

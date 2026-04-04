@@ -62,6 +62,7 @@ add_executable(test_bitcoin
   miniminer_tests.cpp
   miniscript_tests.cpp
   minisketch_tests.cpp
+  mldsa_kat_test.cpp
   mock_process.cpp
   multisig_tests.cpp
   bip328_tests.cpp
