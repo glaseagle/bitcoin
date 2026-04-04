@@ -13,7 +13,7 @@
 #include <vector>
 
 static_assert(MLDSA_PUBKEY_SIZE == 1952);
-static_assert(MLDSA_SECKEY_SIZE == 4000);
+static_assert(MLDSA_SECKEY_SIZE == 4032);
 static_assert(MLDSA_SIG_SIZE == 3293);
 
 FUZZ_TARGET(mldsa_verify)
