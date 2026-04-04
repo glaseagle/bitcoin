@@ -38,13 +38,14 @@
 #define MLDSA_CRHBYTES        64
 #define MLDSA_TRBYTES         64
 #define MLDSA_RNDBYTES        32
+#define MLDSA_CTILDEBYTES     (MLDSA_LAMBDA / 4)
 
 // Polynomial pack sizes
 #define MLDSA_POLYT1_PACKEDBYTES   320
 #define MLDSA_POLYT0_PACKEDBYTES   416
 #define MLDSA_POLYVECH_PACKEDBYTES (MLDSA_OMEGA + MLDSA_K)
 #define MLDSA_POLYZ_PACKEDBYTES    640
-#define MLDSA_POLYW1_PACKEDBYTES   192
+#define MLDSA_POLYW1_PACKEDBYTES   128
 #define MLDSA_POLYETA_PACKEDBYTES  128
 
 // Key / signature sizes
@@ -53,12 +54,13 @@
                                + MLDSA_L * MLDSA_POLYETA_PACKEDBYTES \
                                + MLDSA_K * MLDSA_POLYETA_PACKEDBYTES \
                                + MLDSA_K * MLDSA_POLYT0_PACKEDBYTES)
-#define MLDSA_SIGNBYTES       (MLDSA_LAMBDA/4 \
+#define MLDSA_SIGNBYTES       (MLDSA_CTILDEBYTES \
                                + MLDSA_L * MLDSA_POLYZ_PACKEDBYTES \
                                + MLDSA_POLYVECH_PACKEDBYTES)
 
 // Verify these match FIPS 204 Table 2
 static_assert(MLDSA_PUBLICKEYBYTES == 1952, "Public key size mismatch");
+static_assert(MLDSA_SECRETKEYBYTES == 4032, "Secret key size mismatch");
 static_assert(MLDSA_SIGNBYTES == 3293,      "Signature size mismatch");
 
 // Montgomery reduction constant: 2^32 mod q
