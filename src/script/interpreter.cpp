@@ -8,10 +8,16 @@
 #include <crypto/ripemd160.h>
 #include <crypto/sha1.h>
 #include <crypto/sha256.h>
+#include <primitives/transaction.h> // PQC
 #include <pubkey.h>
+#include <script/interpreter_pqc.h> // PQC
 #include <script/script.h>
+#include <serialize.h> // PQC
+#include <streams.h> // PQC
 #include <tinyformat.h>
 #include <uint256.h>
+
+#include <cstring> // PQC
 
 typedef std::vector<unsigned char> valtype;
 
@@ -1987,6 +1993,37 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
             }
             return set_success(serror);
         }
+    } else if (witversion == 2 && !is_p2sh) {
+        // PQC: SegWit v2 PQC witness verification bridge.
+        PQCTxContext pqc_ctx{};
+        bool have_pqc_ctx{false};
+        const auto build_pqc_ctx = [&](const auto* sigchecker) {
+            if (sigchecker == nullptr || sigchecker->GetTxTo() == nullptr) return false;
+            const auto* tx_to = sigchecker->GetTxTo();
+            const unsigned int in_pos = sigchecker->GetInputIndex();
+            if (in_pos >= tx_to->vin.size()) return false;
+            pqc_ctx.nVersion = tx_to->version;
+            pqc_ctx.nLocktime = tx_to->nLockTime;
+            pqc_ctx.nIn = in_pos;
+            pqc_ctx.amount = sigchecker->GetInputAmount();
+            pqc_ctx.nSequence = tx_to->vin[in_pos].nSequence;
+            std::memcpy(pqc_ctx.prevout_hash.data(), tx_to->vin[in_pos].prevout.hash.begin(), pqc_ctx.prevout_hash.size()); // PQC
+            pqc_ctx.prevout_n = tx_to->vin[in_pos].prevout.n;
+            VectorWriter{pqc_ctx.outputs_serialized, 0, tx_to->vout};
+            if (program.size() != pqc_ctx.witness_program.size()) return false;
+            std::copy(program.begin(), program.end(), pqc_ctx.witness_program.begin());
+            return true;
+        };
+        if (const auto* tx_checker = dynamic_cast<const TransactionSignatureChecker*>(&checker)) {
+            have_pqc_ctx = build_pqc_ctx(tx_checker);
+        } else if (const auto* mtx_checker = dynamic_cast<const MutableTransactionSignatureChecker*>(&checker)) {
+            have_pqc_ctx = build_pqc_ctx(mtx_checker);
+        }
+        if (!have_pqc_ctx) {
+            return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+        }
+        std::vector<std::vector<uint8_t>> pqc_witness{witness.stack.begin(), witness.stack.end()};
+        return VerifyPQCWitnessProgram(pqc_witness, program, pqc_ctx, serror);
     } else if (!is_p2sh && CScript::IsPayToAnchor(witversion, program)) {
         return true;
     } else {

@@ -331,6 +331,10 @@ public:
     bool CheckSchnorrSignature(std::span<const unsigned char> sig, std::span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr) const override;
     bool CheckLockTime(const CScriptNum& nLockTime) const override;
     bool CheckSequence(const CScriptNum& nSequence) const override;
+    // PQC: Read-only accessors for external witness-version extensions.
+    const T* GetTxTo() const { return txTo; }
+    unsigned int GetInputIndex() const { return nIn; }
+    CAmount GetInputAmount() const { return amount; }
 };
 
 using TransactionSignatureChecker = GenericTransactionSignatureChecker<CTransaction>;

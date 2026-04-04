@@ -31,6 +31,7 @@ enum class TxoutType {
     WITNESS_V0_SCRIPTHASH,
     WITNESS_V0_KEYHASH,
     WITNESS_V1_TAPROOT,
+    WITNESS_V2_PQC,     //!< SegWit v2 post-quantum output (P2PQH or P2HPQ) // PQC
     WITNESS_UNKNOWN, //!< Only for Witness versions not already defined above
 };
 

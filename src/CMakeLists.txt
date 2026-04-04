@@ -69,6 +69,7 @@ add_library(bitcoin_consensus STATIC EXCLUDE_FROM_ALL
   primitives/transaction.cpp
   pubkey.cpp
   script/interpreter.cpp
+  script/interpreter_pqc.cpp # PQC
   script/script.cpp
   script/script_error.cpp
   uint256.cpp
@@ -125,6 +126,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   outputtype.cpp
   policy/feerate.cpp
   policy/policy.cpp
+  policy/policy_pqc.cpp # PQC
   pow.cpp
   protocol.cpp
   psbt.cpp
@@ -138,6 +140,11 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   script/sign.cpp
   script/signingprovider.cpp
   script/solver.cpp
+)
+
+target_sources(bitcoin_crypto PRIVATE
+  crypto/mldsa/mldsa.cpp # PQC
+  crypto/mldsa/mldsa_poly.cpp # PQC
 )
 target_link_libraries(bitcoin_common
   PRIVATE

@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <pubkey.h>
+#include <script/script_pqc.h> // PQC
 #include <script/interpreter.h>
 #include <script/script.h>
 #include <script/solver.h>
@@ -28,6 +29,7 @@ std::string GetTxnOutputType(TxoutType t)
     case TxoutType::WITNESS_V0_KEYHASH: return "witness_v0_keyhash";
     case TxoutType::WITNESS_V0_SCRIPTHASH: return "witness_v0_scripthash";
     case TxoutType::WITNESS_V1_TAPROOT: return "witness_v1_taproot";
+    case TxoutType::WITNESS_V2_PQC: return "witness_v2_pqc"; // PQC
     case TxoutType::WITNESS_UNKNOWN: return "witness_unknown";
     } // no default case, so the compiler can warn about missing cases
     assert(false);
@@ -165,6 +167,13 @@ TxoutType Solver(const CScript& scriptPubKey, std::vector<std::vector<unsigned c
         if (witnessversion == 1 && witnessprogram.size() == WITNESS_V1_TAPROOT_SIZE) {
             vSolutionsRet.push_back(std::move(witnessprogram));
             return TxoutType::WITNESS_V1_TAPROOT;
+        }
+        // PQC: Detect SegWit v2 PQC outputs before the generic witness fallback.
+        if (witnessversion == SEGWIT_VERSION_PQC &&
+            witnessprogram.size() == PQC_WITNESS_PROGRAM_SIZE &&
+            (witnessprogram[0] == PQC_TYPE_PURE || witnessprogram[0] == PQC_TYPE_HYBRID)) {
+            vSolutionsRet.push_back(std::move(witnessprogram));
+            return TxoutType::WITNESS_V2_PQC;
         }
         if (scriptPubKey.IsPayToAnchor()) {
             return TxoutType::ANCHOR;

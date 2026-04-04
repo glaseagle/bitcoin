@@ -13,8 +13,10 @@
 #include <consensus/validation.h>
 #include <policy/feerate.h>
 #include <primitives/transaction.h>
+#include <policy/policy_pqc.h> // PQC
 #include <script/interpreter.h>
 #include <script/script.h>
+#include <script/script_pqc.h> // PQC
 #include <script/solver.h>
 #include <serialize.h>
 #include <span.h>
@@ -84,6 +86,10 @@ bool IsStandard(const CScript& scriptPubKey, TxoutType& whichType)
 
     if (whichType == TxoutType::NONSTANDARD) {
         return false;
+    } else if (whichType == TxoutType::WITNESS_V2_PQC) {
+        // PQC: Relay policy for PQC outputs.
+        std::string pqc_reason;
+        return IsStandardPQCOutput(scriptPubKey, pqc_reason);
     } else if (whichType == TxoutType::MULTISIG) {
         unsigned char m = vSolutions.front()[0];
         unsigned char n = vSolutions.back()[0];
@@ -344,6 +350,19 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
                 // (no policy rules apply)
             } else {
                 // 0 stack elements; this is already invalid by consensus rules
+                return false;
+            }
+        }
+        // PQC: Apply standard witness stack checks for SegWit v2 PQC programs.
+        if (witnessversion == SEGWIT_VERSION_PQC &&
+            witnessprogram.size() == PQC_WITNESS_PROGRAM_SIZE &&
+            (witnessprogram[0] == PQC_TYPE_PURE || witnessprogram[0] == PQC_TYPE_HYBRID)) {
+            std::vector<std::vector<uint8_t>> pqc_witness{
+                tx.vin[i].scriptWitness.stack.begin(),
+                tx.vin[i].scriptWitness.stack.end()
+            };
+            std::string pqc_reason;
+            if (!IsStandardPQCInput(witnessprogram[0], pqc_witness, tx.vin[i].scriptSig, pqc_reason)) {
                 return false;
             }
         }
