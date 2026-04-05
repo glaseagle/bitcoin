@@ -325,9 +325,18 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0; // No activation delay
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 1512; // 75%
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].period = 2016;
+
+        // PQC: BIP-PQC SegWit v2 post-quantum soft fork (testnet4)
+        // Speedy Trial: bit 2, 90% threshold, 1-year window
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].bit = 2;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].nStartTime = 1748736000; // 2025-06-01
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].nTimeout = 1780272000;   // 2026-06-01
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].min_activation_height = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].threshold = 1815; // 90%
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].period = 2016;
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000009a0fe15d0177d086304"};
         consensus.defaultAssumeValid = uint256{"0000000002368b1e4ee27e2e85676ae6f9f9e69579b29093e9a82c170bf7cf8a"}; // 123613
@@ -468,9 +477,18 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0; // No activation delay
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 1815; // 90%
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].period = 2016;
+
+        // PQC: BIP-PQC SegWit v2 post-quantum soft fork (signet)
+        // Speedy Trial: bit 2, 90% threshold, 1-year window
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].bit = 2;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].nStartTime = 1748736000; // 2025-06-01
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].nTimeout = 1780272000;   // 2026-06-01
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].min_activation_height = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].threshold = 1815; // 90%
+        consensus.vDeployments[Consensus::DEPLOYMENT_PQC].period = 2016;
 
         // message start is defined as the first 4 bytes of the sha256d of the block script
         HashWriter h{};

@@ -13,6 +13,11 @@ const std::array<VBDeploymentInfo,Consensus::MAX_VERSION_BITS_DEPLOYMENTS> Versi
         .name = "testdummy",
         .gbt_optional_rule = true,
     },
+    // PQC: BIP-PQC SegWit v2 post-quantum output types (P2PQH, P2HPQ)
+    VBDeploymentInfo{
+        .name = "pqc",
+        .gbt_optional_rule = true,
+    },
 };
 
 std::string DeploymentName(Consensus::BuriedDeployment dep)

@@ -38,6 +38,11 @@ enum DeploymentPos : uint16_t {
     DEPLOYMENT_TESTDUMMY,
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in deploymentinfo.cpp
     // Removing an entry may require bumping MinBIP9WarningHeight.
+
+    // PQC: BIP-PQC SegWit v2 post-quantum output types (P2PQH, P2HPQ)
+    // Speedy Trial, bit 2, 90% threshold — signet/testnet4 only for now
+    DEPLOYMENT_PQC,
+
     MAX_VERSION_BITS_DEPLOYMENTS
 };
 constexpr bool ValidDeployment(DeploymentPos dep) { return dep < MAX_VERSION_BITS_DEPLOYMENTS; }
