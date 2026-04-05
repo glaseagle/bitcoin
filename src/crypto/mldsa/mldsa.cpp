@@ -62,6 +62,24 @@ static void H2(uint8_t *out, size_t outlen,
     shake256(out, outlen, buf.data(), buf.size());
 }
 
+static void H3(uint8_t *out, size_t outlen,
+               const uint8_t *in1, size_t in1len,
+               const uint8_t *in2, size_t in2len,
+               const uint8_t *in3, size_t in3len) {
+    std::vector<uint8_t> buf(in1len + in2len + in3len);
+    memcpy(buf.data(), in1, in1len);
+    memcpy(buf.data() + in1len, in2, in2len);
+    memcpy(buf.data() + in1len + in2len, in3, in3len);
+    shake256(out, outlen, buf.data(), buf.size());
+}
+
+static void mldsa_polyvecl_add(mldsa_polyvecl* w, const mldsa_polyvecl* u, const mldsa_polyvecl* v)
+{
+    for (int i = 0; i < MLDSA_L; ++i) {
+        mldsa_poly_add(&w->vec[i], &u->vec[i], &v->vec[i]);
+    }
+}
+
 // ---- Public key packing ----
 
 static void pack_pk(uint8_t pk[MLDSA_PUBLICKEYBYTES],
@@ -161,8 +179,9 @@ static int unpack_sig(uint8_t c[MLDSA_CTILDEBYTES],
             h->vec[i].coeffs[j] = 0;
         if (hp[MLDSA_OMEGA + i] < k2 || hp[MLDSA_OMEGA + i] > MLDSA_OMEGA)
             return 1; // Malformed hint
+        const unsigned int start = k2;
         for (; k2 < hp[MLDSA_OMEGA + i]; ++k2) {
-            if (k2 > 0 && hp[k2] <= hp[k2-1]) return 1; // Not sorted
+            if (k2 > start && hp[k2] <= hp[k2-1]) return 1; // Not sorted within polynomial
             h->vec[i].coeffs[hp[k2]] = 1;
         }
     }
@@ -250,26 +269,109 @@ bool MLDSA_Sign(MLDSASignature& sig,
     uint8_t rho[MLDSA_SEEDBYTES];
     uint8_t tr[MLDSA_TRBYTES];
     uint8_t key[MLDSA_SEEDBYTES];
+    uint8_t mu[MLDSA_CRHBYTES];
+    uint8_t rhoprime[MLDSA_CRHBYTES];
+    uint8_t rnd[MLDSA_RNDBYTES] = {0};
+    uint8_t c_tilde[MLDSA_CTILDEBYTES];
+    uint8_t w1_bytes[MLDSA_K * MLDSA_POLYW1_PACKEDBYTES];
+    uint16_t kappa = 0;
+    mldsa_poly cp;
     mldsa_polyveck t0;
     mldsa_polyvecl s1;
     mldsa_polyveck s2;
+    mldsa_polyvecl mat[MLDSA_K];
+    mldsa_polyvecl y;
+    mldsa_polyvecl z;
+    mldsa_polyveck w;
+    mldsa_polyveck w0;
+    mldsa_polyveck w1;
+    mldsa_polyveck h;
+    mldsa_polyveck tmp;
+
     unpack_sk(rho, tr, key, &t0, &s1, &s2, sk.data());
 
-    uint8_t digest[MLDSA_CTILDEBYTES];
-    H2(digest, sizeof(digest), tr, MLDSA_TRBYTES, msg, msg_len);
+    H2(mu, sizeof(mu), tr, MLDSA_TRBYTES, msg, msg_len);
+    if (rnd_in != nullptr) {
+        memcpy(rnd, rnd_in, sizeof(rnd));
+    }
+    H3(rhoprime, sizeof(rhoprime), key, sizeof(key), rnd, sizeof(rnd), mu, sizeof(mu));
 
-    sig.fill(0);
-    memcpy(sig.data(), digest, sizeof(digest));
+    mldsa_polyvec_matrix_expand(mat, rho);
+    mldsa_polyvecl_ntt(&s1);
+    mldsa_polyveck_ntt(&s2);
+    mldsa_polyveck_ntt(&t0);
+
+    for (;;) {
+        mldsa_polyvecl_uniform_gamma1(&y, rhoprime, kappa);
+
+        z = y;
+        mldsa_polyvecl_ntt(&z);
+        mldsa_polyvec_matrix_pointwise_montgomery(&w, mat, &z);
+        mldsa_polyveck_reduce(&w);
+        mldsa_polyveck_invntt_tomont(&w);
+        mldsa_polyveck_caddq(&w);
+
+        mldsa_polyveck_decompose(&w1, &w0, &w);
+        mldsa_polyveck_pack_w1(w1_bytes, &w1);
+        H2(c_tilde, sizeof(c_tilde), mu, sizeof(mu), w1_bytes, sizeof(w1_bytes));
+        mldsa_poly_challenge(&cp, c_tilde);
+        mldsa_poly_ntt(&cp);
+
+        mldsa_polyvecl_pointwise_poly_montgomery(&z, &cp, &s1);
+        mldsa_polyvecl_invntt_tomont(&z);
+        mldsa_polyvecl_add(&z, &z, &y);
+        mldsa_polyvecl_reduce(&z);
+        if (mldsa_polyvecl_chknorm(&z, MLDSA_GAMMA1 - MLDSA_BETA)) {
+            kappa += 1;
+            continue;
+        }
+
+        mldsa_polyveck_pointwise_poly_montgomery(&tmp, &cp, &s2);
+        mldsa_polyveck_invntt_tomont(&tmp);
+        mldsa_polyveck_sub(&w0, &w0, &tmp);
+        mldsa_polyveck_reduce(&w0);
+        if (mldsa_polyveck_chknorm(&w0, MLDSA_GAMMA2 - MLDSA_BETA)) {
+            kappa += 1;
+            continue;
+        }
+
+        mldsa_polyveck_pointwise_poly_montgomery(&tmp, &cp, &t0);
+        mldsa_polyveck_invntt_tomont(&tmp);
+        mldsa_polyveck_reduce(&tmp);
+        if (mldsa_polyveck_chknorm(&tmp, MLDSA_GAMMA2)) {
+            kappa += 1;
+            continue;
+        }
+
+        mldsa_polyveck_add(&w0, &w0, &tmp);
+        if (mldsa_polyveck_make_hint(&h, &w0, &w1) > MLDSA_OMEGA) {
+            kappa += 1;
+            continue;
+        }
+
+        pack_sig(sig.data(), c_tilde, &z, &h);
+        break;
+    }
 
     local_memory_cleanse(rho, sizeof(rho));
     local_memory_cleanse(tr, sizeof(tr));
     local_memory_cleanse(key, sizeof(key));
+    local_memory_cleanse(mu, sizeof(mu));
+    local_memory_cleanse(rhoprime, sizeof(rhoprime));
+    local_memory_cleanse(rnd, sizeof(rnd));
+    local_memory_cleanse(c_tilde, sizeof(c_tilde));
+    local_memory_cleanse(w1_bytes, sizeof(w1_bytes));
+    local_memory_cleanse(&cp, sizeof(cp));
     local_memory_cleanse(&t0, sizeof(t0));
     local_memory_cleanse(&s1, sizeof(s1));
     local_memory_cleanse(&s2, sizeof(s2));
-    if (rnd_in) {
-        // Hedge input is currently ignored, but keep the API side-effect free.
-    }
+    local_memory_cleanse(&y, sizeof(y));
+    local_memory_cleanse(&z, sizeof(z));
+    local_memory_cleanse(&w, sizeof(w));
+    local_memory_cleanse(&w0, sizeof(w0));
+    local_memory_cleanse(&w1, sizeof(w1));
+    local_memory_cleanse(&h, sizeof(h));
+    local_memory_cleanse(&tmp, sizeof(tmp));
     return true;
 }
 
@@ -280,21 +382,65 @@ bool MLDSA_Sign(MLDSASignature& sig,
 bool MLDSA_Verify(const MLDSASignature& sig,
                   const uint8_t* msg, size_t msg_len,
                   const MLDSAPublicKey& pk) {
+    uint8_t rho[MLDSA_SEEDBYTES];
     uint8_t tr[MLDSA_TRBYTES];
-    shake256(tr, MLDSA_TRBYTES, pk.data(), MLDSA_PUBLICKEYBYTES);
-    uint8_t expected[MLDSA_CTILDEBYTES];
-    H2(expected, sizeof(expected), tr, MLDSA_TRBYTES, msg, msg_len);
+    uint8_t mu[MLDSA_TRBYTES];
+    uint8_t c_tilde[MLDSA_CTILDEBYTES];
+    uint8_t c_tilde_check[MLDSA_CTILDEBYTES];
+    uint8_t w1_bytes[MLDSA_K * MLDSA_POLYW1_PACKEDBYTES];
+    mldsa_poly cp;
+    mldsa_polyvecl mat[MLDSA_K];
+    mldsa_polyvecl z;
+    mldsa_polyveck t1;
+    mldsa_polyveck h;
+    mldsa_polyveck w1;
+    mldsa_polyveck tmp;
+
+    unpack_pk(rho, &t1, pk.data());
+    if (unpack_sig(c_tilde, &z, &h, sig.data())) {
+        return false;
+    }
+    if (mldsa_polyvecl_chknorm(&z, MLDSA_GAMMA1 - MLDSA_BETA)) {
+        return false;
+    }
+
+    mldsa_polyvec_matrix_expand(mat, rho);
+    H(tr, sizeof(tr), pk.data(), MLDSA_PUBLICKEYBYTES);
+    H2(mu, sizeof(mu), tr, sizeof(tr), msg, msg_len);
+    mldsa_poly_challenge(&cp, c_tilde);
+
+    mldsa_polyvecl_ntt(&z);
+    mldsa_polyvec_matrix_pointwise_montgomery(&w1, mat, &z);
+
+    mldsa_polyveck_shiftl(&t1);
+    mldsa_polyveck_ntt(&t1);
+    mldsa_poly_ntt(&cp);
+    mldsa_polyveck_pointwise_poly_montgomery(&tmp, &cp, &t1);
+    mldsa_polyveck_sub(&w1, &w1, &tmp);
+    mldsa_polyveck_reduce(&w1);
+    mldsa_polyveck_invntt_tomont(&w1);
+    mldsa_polyveck_caddq(&w1);
+    mldsa_polyveck_use_hint(&w1, &w1, &h);
+    mldsa_polyveck_pack_w1(w1_bytes, &w1);
+    H2(c_tilde_check, sizeof(c_tilde_check), mu, sizeof(mu), w1_bytes, sizeof(w1_bytes));
 
     uint8_t diff = 0;
-    for (size_t i = 0; i < MLDSA_CTILDEBYTES; ++i) {
-        diff |= sig[i] ^ expected[i];
-    }
-    for (size_t i = MLDSA_CTILDEBYTES; i < MLDSA_SIG_SIZE; ++i) {
-        diff |= sig[i];
+    for (size_t i = 0; i < sizeof(c_tilde_check); ++i) {
+        diff |= c_tilde[i] ^ c_tilde_check[i];
     }
 
+    local_memory_cleanse(rho, sizeof(rho));
     local_memory_cleanse(tr, sizeof(tr));
-    local_memory_cleanse(expected, sizeof(expected));
+    local_memory_cleanse(mu, sizeof(mu));
+    local_memory_cleanse(c_tilde, sizeof(c_tilde));
+    local_memory_cleanse(c_tilde_check, sizeof(c_tilde_check));
+    local_memory_cleanse(w1_bytes, sizeof(w1_bytes));
+    local_memory_cleanse(&cp, sizeof(cp));
+    local_memory_cleanse(&z, sizeof(z));
+    local_memory_cleanse(&t1, sizeof(t1));
+    local_memory_cleanse(&h, sizeof(h));
+    local_memory_cleanse(&w1, sizeof(w1));
+    local_memory_cleanse(&tmp, sizeof(tmp));
     return diff == 0;
 }
 
