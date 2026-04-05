@@ -33,6 +33,8 @@ add_library(bitcoin_wallet STATIC EXCLUDE_FROM_ALL
   wallet.cpp
   walletdb.cpp
   walletutil.cpp
+  # PQC: post-quantum key storage and signing
+  pqc_wallet.cpp
 )
 target_link_libraries(bitcoin_wallet
   PRIVATE
