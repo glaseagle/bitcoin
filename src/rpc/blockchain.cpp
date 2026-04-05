@@ -1503,6 +1503,8 @@ UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& 
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_CSV);
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_SEGWIT);
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TESTDUMMY);
+    // PQC: BIP-PQC SegWit v2 post-quantum output types (P2PQH, P2HPQ)
+    SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_PQC);
     return softforks;
 }
 } // anon namespace
